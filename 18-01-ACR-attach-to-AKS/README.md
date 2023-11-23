@@ -7,7 +7,7 @@ description: Build a Docker Image, Push to Azure Container Registry and  Attach 
 
 # Architecture Diagram
 
-![Integrate Azure Container Registry ACR with AKS](./arch-diagram/Azure%20ACR%20and%20AKS%20-%20Integration.drawio.png)
+![Integrate Azure Container Registry ACR with AKS](./arch-diagram/arch-diagram.png)
 
 # Commentary on Architectural Diagram
 
