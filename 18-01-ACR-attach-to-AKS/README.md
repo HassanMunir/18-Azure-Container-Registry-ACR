@@ -1,175 +1,194 @@
 ---
 title: Integrate Azure Container Registry ACR with AKS
-description: Build a Docker Image, Push to Azure Container Registry and  Attach ACR with AKS 
+description: Build a Docker Image, Push to Azure Container Registry and  Attach ACR with AKS
 ---
 
 # Integrate Azure Container Registry ACR with AKS
 
-## Step-00: Pre-requisites
-- We should have Azure AKS Cluster Up and Running.
-- We have created a new aksdemo2 cluster as part of Azure Virtual Nodes demo in previous section.
-- We are going to leverage the same cluster for all 3 demos planned for Azure Container Registry and AKS.
-```
-# Configure Command Line Credentials
-az aks get-credentials --name aksdemo2 --resource-group aks-rg2
+# Architecture Diagram
 
-# Verify Nodes
-kubectl get nodes 
+![Integrate Azure Container Registry ACR with AKS](./arch-diagram/Azure%20ACR%20and%20AKS%20-%20Integration.drawio.png)
+
+# Commentary on Architectural Diagram
+
+## Overview
+
+The attached architectural diagram shows how to integrate Azure Container Registry (ACR) with Azure Kubernetes Service (AKS). ACR is a container registry service that allows developers to build, store, and manage container images. AKS is a managed Kubernetes service that allows developers to deploy and manage containerized applications.
+
+## Integration
+
+There are two main steps to integrate ACR with AKS:
+
+1. Authorize AKS to pull images from ACR. This can be done using an Azure Active Directory (Azure AD) service principal or a managed identity.
+   2.0Configure AKS to use ACR. This can be done using the Azure CLI, Azure PowerShell, or the Azure portal.
+
+Once AKS is authorized to pull images from ACR and configured to use ACR, pods in the AKS cluster can pull images from ACR without any additional configuration.
+
+## Diagram commentary
+
+The diagram shows the following
+
+1. shows a single AKS cluster and a single ACR. However, you can integrate multiple AKS clusters with a single ACR, or a single AKS cluster with multiple ACRs.
+
+2. shows a public IP address for the AKS Load Balancer. However, you can also use a private IP address for the AKS Load Balancer, or you can use a managed Azure service such as Azure Application Gateway.
+
+3. shows an Nginx application as the AKS application. However, you can deploy any type of containerized application to AKS.
+
+## Benefits of integrating ACR with AKS
+
+There are several benefits to integrating ACR with AKS:
+
+1. Simplified image management: ACR provides a central location to store and manage container images. This simplifies image management and makes it easier to share images across teams and projects.
+2. Improved security: ACR provides security features such as role-based access control (RBAC) and image signing. This helps to keep your container images secure.
+3. Increased performance: ACR is a highly scalable and performant service. This means that your AKS applications can quickly and reliably pull images from ACR.
+
+Overall, integrating ACR with AKS is a simple and effective way to improve the security, performance, and manageability of your containerized applications.
+
+# Steps to follow
+
+## Step 1: Pre-requisites
+
+- Azure AKS Cluster should be running with azure virtual nodes option 'on'
+
+### Step 1-1: Configure Command Line Credentials
+
+az aks get-credentials --name aksdemo2 --resource-group aks-demo-gp2
+
+### Step 1-2: Verify Nodes
+
+kubectl get nodes
 kubectl get nodes -o wide
 
-# Verify aci-connector-linux
+### Step 1-3: Verify aci-connector-linux
+
 kubectl get pods -n kube-system
 
-# Verify logs of ACI Connector Linux
+### Step 1-4: Verify logs of ACI Connector Linux
+
 kubectl logs -f $(kubectl get po -n kube-system | egrep -o 'aci-connector-linux-[A-Za-z0-9-]+') -n kube-system
-```
 
-## Step-01: Introduction
-- Build a Docker Image from our Local Docker on our Desktop
-- Tag the docker image in the required ACR Format
-- Push to Azure Container Registry
-- Attach ACR with AKS
-- Deploy kubernetes workloads and see if the docker image got pulled automatically from ACR we have created. 
+## Step 2: Create Azure Container Registry
 
-
-[![Image](https://stacksimplify.com/course-images/azure-kubernetes-service-and-acr.png "Azure AKS Kubernetes - Masterclass")](https://stacksimplify.com/course-images/azure-kubernetes-service-and-acr.png)
-
-[![Image](https://stacksimplify.com/course-images/azure-container-registry-pricing-tiers.png "Azure AKS Kubernetes - Masterclass")](https://stacksimplify.com/course-images/azure-container-registry-pricing-tiers.png)
-
-## Step-02: Create Azure Container Registry
 - Go to Services -> Container Registries
-- Click on **Add**
-- Subscription: StackSimplify-Paid-Subsciption
-- Resource Group: aks-rg2
-- Registry Name: acrforaksdemo2   (NAME should be unique across Azure Cloud)
-- Location: Central US
-- SKU: Basic  (Pricing Note: $0.167 per day)
-- Click on **Review + Create**
-- Click on **Create**
+- Click on Add
+- Resource Group: aks-demo-gp2
+- Registry Name: acrforaksdemo2test
+- Location: East US
+- Click on 'Review + Create'
 
-## Step-02: Build Docker Image Locally
-- Review Docker Manigests 
-```
-# Change Directory
+## Step 3: Build Docker Image Locally
+
+### Step 3-1: Change Directory
+
 cd docker-manifests
- 
-# Docker Build
+
+### Step 3-2: Docker Build
+
 docker build -t kube-nginx-acr:v1 .
 
-# List Docker Images
-docker images
-docker images kube-nginx-acr:v1
-```
+### Step 3-3: List Docker Images
 
-## Step-03: Run Docker Container locally and test
-```
-# Run locally and Test
+docker images kube-nginx-acr:v1
+
+## Step 4: Run Docker Container locally and test
+
+### Step 4-1: Run locally and Test
+
 docker run --name kube-nginx-acr --rm -p 80:80 -d kube-nginx-acr:v1
 
-# Access Application locally
+### Step 4-2: Access Application locally
+
 http://localhost
 
-# Stop Docker Image
-docker stop kube-nginx-acr
-```
+### Step 4-3: Stop Docker Image
 
-## Step-04: Enable Docker Login for ACR Repository 
+docker stop kube-nginx-acr
+
+## Step 5: Enable Docker Login for ACR Repository
+
 - Go to Services -> Container Registries -> acrforaksdemo2
-- Go to **Access Keys**
-- Click on **Enable Admin User**
+- Go to Access Keys
+- Click on Enable Admin User
 - Make a note of Username and password
 
-## Step-05: Push Docker Image to ACR
+## Step 6: Push Docker Image to ACR
 
-### Build, Test Locally, Tag and Push to ACR
-```
-# Export Command
-export ACR_REGISTRY=acrforaksdemo2.azurecr.io
-export ACR_NAMESPACE=app1
-export ACR_IMAGE_NAME=kube-nginx-acr
-export ACR_IMAGE_TAG=v1
-echo $ACR_REGISTRY, $ACR_NAMESPACE, $ACR_IMAGE_NAME, $ACR_IMAGE_TAG
+### Step 6-1: Build, Test Locally, Tag and Push to ACR
 
-# Login to ACR
-docker login $ACR_REGISTRY
+### Step 6-1-1: Login to ACR
 
-# Tag
-docker tag kube-nginx-acr:v1  $ACR_REGISTRY/$ACR_NAMESPACE/$ACR_IMAGE_NAME:$ACR_IMAGE_TAG
-It replaces as below
-docker tag kube-nginx-acr:v1 acrforaksdemo2.azurecr.io/app1/kube-nginx-acr:v1
+docker login acrforaksdemo2test.azurecr.io
 
-# List Docker Images to verify
+### Step 6-1-2: Tag
+
+docker tag kube-nginx-acr:v1 acrforaksdemo2test.azurecr.io/app1/kube-nginx-acr:v1
+
+### Step 6-1-3: List Docker Images to verify
+
 docker images kube-nginx-acr:v1
-docker images $ACR_REGISTRY/$ACR_NAMESPACE/$ACR_IMAGE_NAME:$ACR_IMAGE_TAG
+docker images acrforaksdemo2test.azurecr.io/app1/kube-nginx-acr:v1
 
-# Push Docker Images
-docker push $ACR_REGISTRY/$ACR_NAMESPACE/$ACR_IMAGE_NAME:$ACR_IMAGE_TAG
-```
-### Verify Docker Image in ACR Repository
-- Go to Services -> Container Registries -> acrforaksdemo2
-- Go to **Repositories** -> **app1/kube-nginx-acr**
+### Step 6-1-4: Push Docker Images
 
+docker push acrforaksdemo2test.azurecr.io/app1/kube-nginx-acr:v1
 
-## Step-05: Configure ACR integration for existing AKS clusters
-```
-#Set ACR NAME
-export ACR_NAME=acrforaksdemo2
-echo $ACR_NAME
+### Step 6-1-5: Verify Docker Image in ACR Repository
 
-# Template
-az aks update -n myAKSCluster -g myResourceGroup --attach-acr <acr-name>
+- Go to Services -> Container Registries -> acrforaksdemo2test
+- Go to Repositories -> app1/kube-nginx-acr
 
-# Replace Cluster, Resource Group and ACR Repo Name
-az aks update -n aksdemo2 -g aks-rg2 --attach-acr $ACR_NAME
-```
+### Step 6-1-6: Configure ACR integration for existing AKS clusters
 
+az aks update -n myAKSCluster -g myResourceGroup --attach-acr acrforaksdemo2test
 
-## Step-06: Update & Deploy to AKS & Test
-### Update Deployment Manifest with Image Name
+### Step 6-1-7: Replace Cluster, Resource Group and ACR Repo Name
+
+az aks update -n aksdemo2 -g aks-demo-gp2 --attach-acr acrforaksdemo2test
+
+## Step 7: Update & Deploy to AKS & Test
+
+### Step 7-1: Update Deployment Manifest with Image Name
+
 ```yaml
-    spec:
-      containers:
-        - name: acrdemo-localdocker
-          image: acrforaksdemo2.azurecr.io/app1/kube-nginx-acr:v1
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 80
+spec:
+  containers:
+    - name: acrdemo-localdocker
+      image: acrforaksdemo2test.azurecr.io/app1/kube-nginx-acr:v1
+      imagePullPolicy: Always
+      ports:
+        - containerPort: 80
 ```
 
-### Deploy to AKS and Test
-```
-# Deploy
+### Step 7-2: Deploy to AKS and Test
+
+### Step 7-2-1: Deploy
+
 kubectl apply -f kube-manifests/
 
-# List Pods
+### Step 7-2-2: List Pods
+
 kubectl get pods
 
-# Describe Pod
-kubectl describe pod <pod-name>
+### Step 7-2-3: Describe Pod
 
-# Get Load Balancer IP
-kubectl get svc
+kubectl describe pod 'pod-name'
 
-# Access Application
-http://<External-IP-from-get-service-output>
-```
+### Step 7-2-4: Get Load Balancer IP
 
-## Step-07: Clean-Up
-```
-# Delete Applications
+kubectl get svc and copy external IP
+
+## Step 8: Clean-Up
+
+### Step 8-1: Delete Applications
+
 kubectl delete -f kube-manifests/
-```
 
-## Step-08: Detach ACR from AKS Cluster (Optional)
-```
-#Set ACR NAME
-export ACR_NAME=acrforaksdemo2
-echo $ACR_NAME
+### Step 8-2: Detach ACR from AKS Cluster
 
-# Detach ACR with AKS Cluster
-az aks update -n aksdemo2 -g aks-rg2 --detach-acr $ACR_NAME
+### Step 8-2-1: Detach ACR with AKS Cluster
 
-# Delete ACR Repository
+az aks update -n aksdemo2 -g aks-demo-gp2 --detach-acr acrforaksdemo2test
+
+### Step 8-2-2: Delete ACR Repository
+
 Go To Services -> Container Registries -> acrforaksdemo2 -> Delete it
-```
-
